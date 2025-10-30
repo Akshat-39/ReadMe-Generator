@@ -1,0 +1,13 @@
+{
+  "name": "readme-generator",
+  "version": "1.0.0",
+  "main": "testAPIKey.js",
+  "type": "module",
+  "scripts": {
+    "test": "node testAPIKey.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.28.0",
+    "node-fetch": "^3.3.2"
+  }
+}
