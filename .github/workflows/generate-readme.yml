@@ -3,25 +3,34 @@ name: Generate README
 on:
   workflow_dispatch: # allows manual triggering
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Install dependencies
         run: npm install @google/generative-ai
+
       - name: Generate README
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: node scripts/generate-readme.js
+
       - name: Commit README
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
           git commit -m "Auto-generate README" || echo "No changes to commit"
-          git push
+          git push "https://${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" HEAD:main
