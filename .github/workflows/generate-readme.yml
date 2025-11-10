@@ -25,12 +25,20 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: node scripts/generate-readme.js
 
-      - name: Commit README
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit README changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git commit -m "Auto-generate README" || echo "No changes to commit"
-          git push "https://${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" HEAD:main
+          git commit -m "Auto-generate/update README" || echo "No changes to commit"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Auto-generate/update README"
+          title: "Auto-generate/update README"
+          body: "This PR updates the README.md file using the automated action."
+          branch: auto/readme-update-${{ github.run_id }}
+          base: ${{ github.event.repository.default_branch }}
+          delete-branch: true
