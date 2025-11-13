@@ -1,48 +1,77 @@
 import fs from "fs";
 import path from "path";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { execSync } from "child_process";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-// Read repo files
-const files = fs.readdirSync(".");
-
-// Read existing README.md if it exists
-let existingReadme = "";
-const readmePath = path.join(process.cwd(), "README.md");
-if (fs.existsSync(readmePath)) {
-  existingReadme = fs.readFileSync(readmePath, "utf-8");
+function detectImportantFiles() {
+  const candidates = [
+    "package.json", "requirements.txt", "pyproject.toml", "setup.py",
+    "Cargo.toml", "go.mod", "composer.json",
+    "Makefile", "Dockerfile", "README.md",
+    ".github/workflows/", "scripts/"
+  ];
+  return candidates.filter(f => fs.existsSync(f));
 }
 
-// Get git diff summary between current branch and main
+function readFileContent(filePath, maxBytes = 3000) {
+  try {
+    const stats = fs.statSync(filePath);
+    if (stats.isDirectory()) {
+      const files = fs.readdirSync(filePath).slice(0, 5);
+      return files.map(f => readFileContent(`${filePath}/${f}`, maxBytes)).join("\n");
+    } else if (stats.isFile()) {
+      const content = fs.readFileSync(filePath, "utf-8");
+      return `File: ${filePath}\n${content.slice(0, maxBytes)}\n---\n`;
+    }
+  } catch {
+    return `File: ${filePath} (unreadable)\n`;
+  }
+  return "";
+}
+
+// Inputs
+const inputFiles = process.env.INPUT_IMPORTANT_FILES
+  ? process.env.INPUT_IMPORTANT_FILES.split(",").map(f => f.trim()).filter(Boolean)
+  : [];
+const importantFiles = inputFiles.length > 0 ? inputFiles : detectImportantFiles();
+const importantFilesContent = importantFiles.map(f => readFileContent(f)).join("\n");
+
+// Existing README
+const readmePath = path.join(process.cwd(), "README.md");
+const existingReadme = fs.existsSync(readmePath) ? fs.readFileSync(readmePath, "utf-8") : "";
+
+// Git diff summary
 let diffSummary = "";
 try {
   diffSummary = execSync("git diff origin/main...HEAD --name-status", { encoding: "utf-8" });
-} catch (e) {
+} catch {
   diffSummary = "Could not get git diff.";
 }
 
-// Get full diff details between current branch and main
-let diffDetails = "";
-try {
-  diffDetails = execSync("git diff origin/main...HEAD", { encoding: "utf-8" });
-} catch (e) {
-  diffDetails = "Could not get git diff details.";
-}
+const context = `
+You are an expert technical writer creating or updating a README.md for a software repository.
 
-const context = `Repository files:\n${files.join("\n")}\n\nCurrent README.md (if any):\n${existingReadme}\n\nRecent changes on this branch (vs main):\n${diffSummary}\n\nDetailed diff:\n${diffDetails}\n\nUpdate the README.md ONLY IF the changes are relevant (e.g., new features, breaking changes, or documentation updates). If not, leave the README.md unchanged. Ensure the README is accurate and up-to-date.`;
+Repository key files:
+${importantFilesContent}
 
-console.log(context);
+Existing README.md (if any):
+${existingReadme}
 
-// Generate README
+Recent code changes:
+${diffSummary}
+
+Output a clear, informative README.md that accurately describes the project.
+Focus on its purpose, setup, dependencies, and usage. Output only the README content.
+`;
+
 async function main() {
   const result = await model.generateContent(context);
   const readme = result.response.text();
   fs.writeFileSync("README.md", readme);
-  console.log("README.md generated successfully!");
+  console.log("✅ README.md generated successfully!");
 }
 
 main().catch(console.error);
