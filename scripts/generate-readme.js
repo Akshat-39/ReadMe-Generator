@@ -44,6 +44,15 @@ function getGitDiff() {
   }
 }
 
+function extractJson(text) {
+  // Remove code fences like ```json ... ```
+  return text
+    .replace(/```json/i, '')
+    .replace(/```/g, '')
+    .trim();
+}
+
+
 // Main function
 async function main() {
   const readmePath = path.join(process.cwd(), "README.md");
@@ -67,12 +76,12 @@ ${allFiles.join("\n")}
     const selectionResult = await model.generateContent(fileSelectionPrompt);
     let selectedFiles = [];
     try {
-      selectedFiles = JSON.parse(selectionResult.response.text());
-      console.log(selectedFiles)
-    } catch {
-      console.error("⚠ Could not parse Gemini file selection. Using top 20 files by default.");
-      console.error("🔍 Gemini output was:\n", selectionResult.response.text());
-      console.error("⛔ Aborting generation.");
+      const cleaned = extractJson(selectionResult.response.text());
+      selectedFiles = JSON.parse(cleaned);
+      console.log(selectedFiles);
+    } catch (err) {
+      console.error("⛔ Gemini returned invalid JSON. Aborting.");
+      console.error("Raw output:\n", selectionResult.response.text());
       process.exit(1);
     }
 
