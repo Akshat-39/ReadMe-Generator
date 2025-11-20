@@ -1,1 +1,2 @@
 node_modules/*
+.github/actions/generate-readme/node_modules/*

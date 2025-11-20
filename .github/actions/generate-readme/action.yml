@@ -1,0 +1,11 @@
+name: "Generate README"
+description: "Generate or update a README using Gemini AI"
+
+inputs:
+  gemini_api_key:
+    description: "Google Gemini API key"
+    required: true
+
+runs:
+  using: "node20"
+  main: "index.js"
