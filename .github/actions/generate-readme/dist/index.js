@@ -29085,12 +29085,14 @@ ${changedFilesContent}
 Update the README.md to reflect the changes accurately.
 Only modify relevant sections; do not rewrite unrelated sections.
 Output ONLY the updated README content.
+Do not wrap the output in code fences, and if there are no relevant changes, return the existing README unchanged.
 `;
   }
 
   const result = await model.generateContent(context);
   const readme = result.response.text();
   external_fs_.writeFileSync(readmePath, readme);
+  console.log("prompt submitted to Gemini:", context)
   console.log("✅ README.md generated/updated successfully!");
 }
 
