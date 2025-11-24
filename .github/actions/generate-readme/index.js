@@ -55,6 +55,7 @@ function getGitDiff(branch) {
   try {
     execSync("git fetch origin main", { stdio: "ignore" });
     const mergeBase = execSync(`git merge-base origin/main ${branch}`, { encoding: "utf-8" }).trim();
+    console.log("Merge base:", mergeBase);
     if (!mergeBase) return "";
     return execSync(`git diff ${mergeBase}...${branch} --name-status`, { encoding: "utf-8" });
   } catch {
@@ -106,6 +107,7 @@ Do not wrap the output in code fences.
   } else {
     // UPDATE MODE
     const existingReadme = fs.readFileSync(readmePath, "utf-8");
+    console.log("Current branch for diff:", currentBranch);
     const gitDiff = getGitDiff(currentBranch);
 
     if (!gitDiff.trim()) {
