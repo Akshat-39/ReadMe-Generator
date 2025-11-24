@@ -1,8 +1,8 @@
-const fs = require("fs");
-const path = require("path");
-const { execSync } = require("child_process");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const core = require("@actions/core");
+import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as core from "@actions/core";
 
 // --- Get inputs ---
 const apiKey = core.getInput("gemini_api_key");

@@ -5,6 +5,9 @@ inputs:
   gemini_api_key:
     description: "Google Gemini API key"
     required: true
+  branch:
+    description: "Branch to compare with main"
+    required: false
 
 runs:
   using: "node20"
