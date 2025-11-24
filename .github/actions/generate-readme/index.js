@@ -1,23 +1,25 @@
-import fs from "fs";
-import path from "path";
-import { execSync } from "child_process";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import * as core from "@actions/core";
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const core = require("@actions/core");
 
-// --- Get API key from action input ---
+// --- Get inputs ---
 const apiKey = core.getInput("gemini_api_key");
 if (!apiKey) {
   core.setFailed("❌ gemini_api_key input is required");
   process.exit(1);
 }
 
+// Optional input: branch name
+const inputBranch = core.getInput("branch");
+const currentBranch = inputBranch || process.env.GITHUB_REF_NAME || "HEAD";
+
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // --- Helpers ---
-
-// Recursively list all files in a directory
 function listFilesRecursively(dir, prefix = "") {
   const files = [];
   for (const entry of fs.readdirSync(dir)) {
@@ -33,7 +35,6 @@ function listFilesRecursively(dir, prefix = "") {
   return files;
 }
 
-// Read file content (limit bytes)
 function readFileContent(filePath, maxBytes = 5000) {
   try {
     const stats = fs.statSync(filePath);
@@ -45,19 +46,20 @@ function readFileContent(filePath, maxBytes = 5000) {
   }
 }
 
-// Get Git diff summary
-function getGitDiff() {
-  try {
-    execSync("git fetch origin main", { stdio: "ignore" });
-    return execSync("git diff origin/main...HEAD --name-status", { encoding: "utf-8" });
-  } catch {
-    return "Could not get git diff.";
-  }
-}
-
-// Extract JSON safely from Gemini output
 function extractJson(text) {
   return text.replace(/```json/i, "").replace(/```/g, "").trim();
+}
+
+// --- Git diff against main ---
+function getGitDiff(branch) {
+  try {
+    execSync("git fetch origin main", { stdio: "ignore" });
+    const mergeBase = execSync(`git merge-base origin/main ${branch}`, { encoding: "utf-8" }).trim();
+    if (!mergeBase) return "";
+    return execSync(`git diff ${mergeBase}...${branch} --name-status`, { encoding: "utf-8" });
+  } catch {
+    return "";
+  }
 }
 
 // --- Main ---
@@ -99,11 +101,17 @@ ${selectedFilesContent}
 
 Output a clear, informative README.md describing the project, its purpose, setup, dependencies, and usage.
 Output ONLY the README content.
+Do not wrap the output in code fences.
 `;
   } else {
     // UPDATE MODE
     const existingReadme = fs.readFileSync(readmePath, "utf-8");
-    const gitDiff = getGitDiff();
+    const gitDiff = getGitDiff(currentBranch);
+
+    if (!gitDiff.trim()) {
+      console.log("No code changes detected. README.md remains unchanged.");
+      return;
+    }
 
     const changedFiles = gitDiff
       .split("\n")
@@ -118,7 +126,7 @@ You are an expert technical writer updating an existing README.md.
 Existing README.md:
 ${existingReadme}
 
-Recent code changes in this pull request:
+Recent code changes (branch: ${currentBranch} vs main):
 ${gitDiff}
 
 Content of changed files:
@@ -127,14 +135,16 @@ ${changedFilesContent}
 Update the README.md to reflect the changes accurately.
 Only modify relevant sections; do not rewrite unrelated sections.
 Output ONLY the updated README content.
-Do not wrap the output in code fences, and if there are no relevant changes, return the existing README unchanged.
+Do not wrap the output in code fences.
+If there are no relevant changes, return the existing README unchanged.
 `;
   }
 
   const result = await model.generateContent(context);
-  const readme = result.response.text();
+  const readme = result.response.text().trim();
+
   fs.writeFileSync(readmePath, readme);
-  console.log("prompt submitted to Gemini:", context)
+  console.log("prompt submitted to Gemini:", context);
   console.log("✅ README.md generated/updated successfully!");
 }
 
