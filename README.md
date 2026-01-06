@@ -29,21 +29,16 @@ Follow these steps to integrate the README Generator into your GitHub repository
 
 1.  **Copy Action Files**:
     *   Copy the workflow definition file `.github/workflows/generate-readme.yml` into your repository's `.github/workflows/` directory.
-    *   Copy the generation script `scripts/generate-readme.js` into your repository's `scripts/` directory (create this directory if it does not exist).
-
-2.  **Install Dependencies**:
-    Your project's `package.json` will need `@google/generative-ai`. If it's not already there, add it or run:
-    ```bash
-    npm install @google/generative-ai
-    ```
 
 ### Configuration
 
-1.  **Set up GitHub Secret**:
+1.  **Set up GitHub Secrets**:
     *   In your GitHub repository, navigate to **Settings > Secrets and variables > Actions**.
     *   Click "New repository secret".
     *   Name the secret `GEMINI_API_KEY`.
     *   Paste your Google Gemini API key as the value.
+    *   Create another repository secret called `PAT_FOR_ACTIONS`
+    *   Paste your personal access token key as the value to allow for the action to create pull requests
 
 ## 💡 Usage
 
@@ -77,39 +72,50 @@ Here's the full `generate-readme.yml` workflow example:
 name: Generate README
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to compare with main"
+        required: false
+        default: ""
+
 permissions:
   contents: write
   pull-requests: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ Checkout the current branch
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install @google/generative-ai # Ensure this matches your script's dependency
-      - name: Generate README
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: node scripts/generate-readme.js
+          fetch-depth: 0 # full history is needed for git diff
+
+      # 2️⃣ Run README Generator (Reusable Action)
+      - name: Run README Generator
+        uses: Akshat-39/ReadMe-Generator/.github/actions/generate-readme@v1.1.7 # update tag as needed
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          branch: ${{ github.ref_name }} # automatically pass the current branch
+
+      # 3️⃣ Commit README changes if any
       - name: Commit README changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add README.md
-          git commit -m "Auto-generate/update README" || echo "No changes to commit"
+          git diff --cached --quiet || git commit -m "Auto-generate/update README"
+
+      # 4️⃣ Create Pull Request targeting main
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_FOR_ACTIONS }}
           commit-message: "Auto-generate/update README"
           title: "Auto-generate/update README"
           body: "This PR updates the README.md file using the automated action."
           branch: auto/readme-update-${{ github.run_id }}
-          base: ${{ github.event.repository.default_branch }}
+          base: ${{ github.event.inputs.branch || github.ref_name }}
           delete-branch: true
 ```
 
