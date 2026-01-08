@@ -14,6 +14,7 @@ if (!apiKey) {
 // Optional input: branch name
 const inputBranch = core.getInput("branch");
 const currentBranch = inputBranch || process.env.GITHUB_REF_NAME || "HEAD";
+const mainBranch = "main";
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -104,7 +105,7 @@ Output a clear, informative README.md describing the project, its purpose, setup
 Output ONLY the README content.
 Do not wrap the output in code fences.
 `;
-  } else {
+  } else if (currentBranch !== mainBranch) {
     // UPDATE MODE
     const existingReadme = fs.readFileSync(readmePath, "utf-8");
     console.log("Current branch for diff:", currentBranch);
@@ -139,6 +140,45 @@ Only modify relevant sections; do not rewrite unrelated sections.
 Output ONLY the updated README content.
 Do not wrap the output in code fences.
 If there are no relevant changes, return the existing README unchanged.
+`;
+  } else {
+    // MAIN branch & README exists → full generation with current README
+    const allFiles = listFilesRecursively(".");
+    const existingReadme = fs.readFileSync(readmePath, "utf-8");
+
+    const fileSelectionPrompt = `
+You are an AI that generates README.md.
+The repository currently has a README.md, which should be used as guidance:
+${existingReadme}
+
+Given the repository file list below, select up to 50 files you want to see to understand the project.
+Respond ONLY with a JSON array of file paths from the list.
+
+File list:
+${allFiles.join("\n")}
+`;
+    const selectionResult = await model.generateContent(fileSelectionPrompt);
+
+    let selectedFiles;
+    try {
+      selectedFiles = JSON.parse(extractJson(selectionResult.response.text()));
+      if (!Array.isArray(selectedFiles)) throw new Error("Not an array");
+    } catch (err) {
+      core.setFailed("⛔ Gemini returned invalid JSON during file selection. Aborting.");
+      console.error("Raw output:\n", selectionResult.response.text());
+      process.exit(1);
+    }
+
+    const selectedFilesContent = selectedFiles.map(f => readFileContent(f)).join("\n");
+
+    context = `
+You are an expert technical writer updating an existing README.md on main branch.
+Use the existing README.md as guidance but improve it based on key files below:
+${selectedFilesContent}
+
+Output a clear, informative README.md describing the project, its purpose, setup, dependencies, and usage.
+Output ONLY the README content.
+Do not wrap the output in code fences.
 `;
   }
 
