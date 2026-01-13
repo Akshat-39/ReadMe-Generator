@@ -48,6 +48,9 @@ By default, the workflow is configured to be triggered manually via `workflow_di
     *   Go to the **Actions** tab in your GitHub repository.
     *   Locate the workflow named "Generate README".
     *   Click the "Run workflow" button, typically found in a dropdown on the right side of the workflow's detail page.
+    *   Change the drop down to match the name of the branch you are comparing main with.
+    *   Specify the name of the branch you want to compare with main to update the readme in the text box.
+    *   Click the "Run workflow" button.
 
 2.  **Review the Pull Request**:
     *   Once the workflow completes, it will automatically create a new Pull Request titled "Auto-generate/update README" (authored by `github-actions[bot]`).
@@ -59,10 +62,10 @@ By default, the workflow is configured to be triggered manually via `workflow_di
 You can tailor the action's behavior to better suit your project's needs:
 
 *   **Workflow Trigger**: Modify `.github/workflows/generate-readme.yml` to change when the action runs (e.g., `on: [push]` to your main branch, or on `pull_request` events).
-*   **LLM Model & Prompt**: Edit `scripts/generate-readme.js` to:
-    *   Change the LLM model used (currently `gemini-2.5-flash`).
-    *   Adjust the system prompts given to the LLM for README generation or updating.
-    *   Modify the file scanning or content selection logic.
+*   **LLM Model & Prompt**: View `scripts/generate-readme.js` to see:
+    *   The LLM model used (currently `gemini-2.5-flash`).
+    *   The system prompts given to the LLM for README generation or updating.
+    *   The file scanning or content selection logic.
 
 ## 🚀 Example Workflow Configuration
 
@@ -93,7 +96,7 @@ jobs:
 
       # 2️⃣ Run README Generator (Reusable Action)
       - name: Run README Generator
-        uses: Akshat-39/ReadMe-Generator/.github/actions/generate-readme@v1.1.7 # update tag as needed
+        uses: Akshat-39/ReadMe-Generator/.github/actions/generate-readme@v1.2.0 # update tag as needed
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           branch: ${{ github.ref_name }} # automatically pass the current branch
